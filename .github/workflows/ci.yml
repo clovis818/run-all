@@ -12,13 +12,13 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.22.x]
+        go-version: [1.20.x]
         os: [ubuntu-latest, macos-latest, windows-latest]
         arch: [amd64, arm64]
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -57,11 +57,9 @@ jobs:
       shell: bash
 
     - name: Upload zipped binaries and checksums as artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
-        name: binaries
+        name: binaries-${{ matrix.os }}-${{ matrix.arch }}
         path: |
-          run-all-linux-*.zip
-          run-all-macos-*.zip
-          run-all-windows-*.zip
-          *.zip.sha256
+          run-all-${{ matrix.os }}-${{ matrix.arch }}.zip
+          run-all-${{ matrix.os }}-${{ matrix.arch }}.zip.sha256
