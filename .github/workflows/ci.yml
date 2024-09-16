@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         go-version: [1.22.x]
-        os: [ubuntu, macos, windows]
+        os: [linux, darwin, windows]
         arch: [amd64, arm64]
 
     steps:
@@ -33,10 +33,10 @@ jobs:
 
     - name: Build binaries
       run: |
-        if [ "${{ matrix.os }}" == "ubuntu" ]; then
+        if [ "${{ matrix.os }}" == "linux" ]; then
           GOOS=linux GOARCH=${{ matrix.arch }} go build -o run-all-linux-${{ matrix.arch }} ./cmd/run-all
           zip run-all-linux-${{ matrix.arch }}.zip run-all-linux-${{ matrix.arch }}
-        elif [ "${{ matrix.os }}" == "macos" ]; then
+        elif [ "${{ matrix.os }}" == "darwin" ]; then
           GOOS=darwin GOARCH=${{ matrix.arch }} go build -o run-all-macos-${{ matrix.arch }} ./cmd/run-all
           zip run-all-macos-${{ matrix.arch }}.zip run-all-macos-${{ matrix.arch }}
         elif [ "${{ matrix.os }}" == "windows" ]; then
@@ -47,9 +47,9 @@ jobs:
 
     - name: Generate SHA256 checksums
       run: |
-        if [ "${{ matrix.os }}" == "ubuntu" ]; then
+        if [ "${{ matrix.os }}" == "linux" ]; then
           shasum -a 256 run-all-linux-${{ matrix.arch }}.zip > run-all-linux-${{ matrix.arch }}.zip.sha256
-        elif [ "${{ matrix.os }}" == "macos" ]; then
+        elif [ "${{ matrix.os }}" == "darwin" ]; then
           shasum -a 256 run-all-macos-${{ matrix.arch }}.zip > run-all-macos-${{ matrix.arch }}.zip.sha256
         elif [ "${{ matrix.os }}" == "windows" ]; then
           shasum -a 256 run-all-windows-${{ matrix.arch }}.zip > run-all-windows-${{ matrix.arch }}.zip.sha256
