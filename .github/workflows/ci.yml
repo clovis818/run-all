@@ -37,8 +37,8 @@ jobs:
           GOOS=linux GOARCH=${{ matrix.arch }} go build -o run-all-linux-${{ matrix.arch }} ./cmd/run-all
           zip run-all-linux-${{ matrix.arch }}.zip run-all-linux-${{ matrix.arch }}
         elif [ "${{ matrix.os }}" == "darwin" ]; then
-          GOOS=darwin GOARCH=${{ matrix.arch }} go build -o run-all-macos-${{ matrix.arch }} ./cmd/run-all
-          zip run-all-macos-${{ matrix.arch }}.zip run-all-macos-${{ matrix.arch }}
+          GOOS=darwin GOARCH=${{ matrix.arch }} go build -o run-all-darwin-${{ matrix.arch }} ./cmd/run-all
+          zip run-all-darwin-${{ matrix.arch }}.zip run-all-darwin-${{ matrix.arch }}
         elif [ "${{ matrix.os }}" == "windows" ]; then
           GOOS=windows GOARCH=${{ matrix.arch }} go build -o run-all-windows-${{ matrix.arch }}.exe ./cmd/run-all
           zip run-all-windows-${{ matrix.arch }}.zip run-all-windows-${{ matrix.arch }}.exe
@@ -50,11 +50,14 @@ jobs:
         if [ "${{ matrix.os }}" == "linux" ]; then
           shasum -a 256 run-all-linux-${{ matrix.arch }}.zip > run-all-linux-${{ matrix.arch }}.zip.sha256
         elif [ "${{ matrix.os }}" == "darwin" ]; then
-          shasum -a 256 run-all-macos-${{ matrix.arch }}.zip > run-all-macos-${{ matrix.arch }}.zip.sha256
+          shasum -a 256 run-all-darwin-${{ matrix.arch }}.zip > run-all-darwin-${{ matrix.arch }}.zip.sha256
         elif [ "${{ matrix.os }}" == "windows" ]; then
           shasum -a 256 run-all-windows-${{ matrix.arch }}.zip > run-all-windows-${{ matrix.arch }}.zip.sha256
         fi
       shell: bash
+
+    - name: List files (debugging)
+      run: ls -alh
 
     - name: Upload zipped binaries and checksums as artifacts
       uses: actions/upload-artifact@v4
