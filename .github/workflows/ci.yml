@@ -18,7 +18,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -35,30 +35,33 @@ jobs:
       run: |
         if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
           GOOS=linux GOARCH=${{ matrix.arch }} go build -o run-all-linux-${{ matrix.arch }} ./cmd/run-all
+          zip run-all-linux-${{ matrix.arch }}.zip run-all-linux-${{ matrix.arch }}
         elif [ "${{ matrix.os }}" == "macos-latest" ]; then
           GOOS=darwin GOARCH=${{ matrix.arch }} go build -o run-all-macos-${{ matrix.arch }} ./cmd/run-all
+          zip run-all-macos-${{ matrix.arch }}.zip run-all-macos-${{ matrix.arch }}
         elif [ "${{ matrix.os }}" == "windows-latest" ]; then
           GOOS=windows GOARCH=${{ matrix.arch }} go build -o run-all-windows-${{ matrix.arch }}.exe ./cmd/run-all
+          zip run-all-windows-${{ matrix.arch }}.zip run-all-windows-${{ matrix.arch }}.exe
         fi
       shell: bash
 
     - name: Generate SHA256 checksums
       run: |
         if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-          shasum -a 256 run-all-linux-${{ matrix.arch }} > run-all-linux-${{ matrix.arch }}.sha256
+          shasum -a 256 run-all-linux-${{ matrix.arch }}.zip > run-all-linux-${{ matrix.arch }}.zip.sha256
         elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-          shasum -a 256 run-all-macos-${{ matrix.arch }} > run-all-macos-${{ matrix.arch }}.sha256
+          shasum -a 256 run-all-macos-${{ matrix.arch }}.zip > run-all-macos-${{ matrix.arch }}.zip.sha256
         elif [ "${{ matrix.os }}" == "windows-latest" ]; then
-          shasum -a 256 run-all-windows-${{ matrix.arch }}.exe > run-all-windows-${{ matrix.arch }}.sha256
+          shasum -a 256 run-all-windows-${{ matrix.arch }}.zip > run-all-windows-${{ matrix.arch }}.zip.sha256
         fi
       shell: bash
 
-    - name: Upload binaries and checksums as artifacts
-      uses: actions/upload-artifact@v3
+    - name: Upload zipped binaries and checksums as artifacts
+      uses: actions/upload-artifact@v4
       with:
         name: binaries
         path: |
-          run-all-linux-*
-          run-all-macos-*
-          run-all-windows-*
-          *.sha256
+          run-all-linux-*.zip
+          run-all-macos-*.zip
+          run-all-windows-*.zip
+          *.zip.sha256
