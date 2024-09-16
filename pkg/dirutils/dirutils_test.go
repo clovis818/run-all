@@ -6,6 +6,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetDirectories(t *testing.T) {
@@ -17,13 +19,11 @@ func TestGetDirectories(t *testing.T) {
 
 	// Test
 	directories, err := GetDirectories(filepath.Join(testDir, "*"))
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
 
-	if len(directories) != 1 || directories[0] != subDir {
-		t.Fatalf("Expected %s, got %v", subDir, directories)
-	}
+	// Assert
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(directories))
+	assert.Equal(t, subDir, directories[0])
 }
 
 func TestExcludeDirectories(t *testing.T) {
@@ -41,9 +41,9 @@ func TestExcludeDirectories(t *testing.T) {
 	// Test
 	filteredDirs := ExcludeDirectories(directories, excludePatterns, testDir)
 
-	if len(filteredDirs) != 1 || filteredDirs[0] != subDir2 {
-		t.Fatalf("Expected %s, got %v", subDir2, filteredDirs)
-	}
+	// Assert
+	assert.Equal(t, 1, len(filteredDirs))
+	assert.Equal(t, subDir2, filteredDirs[0])
 }
 
 func TestFilterDirectoriesWithRequirement(t *testing.T) {
@@ -61,9 +61,9 @@ func TestFilterDirectoriesWithRequirement(t *testing.T) {
 	// Test
 	filteredDirs := FilterDirectoriesWithRequirement(directories, ".git")
 
-	if len(filteredDirs) != 1 || filteredDirs[0] != subDir1 {
-		t.Fatalf("Expected %s, got %v", subDir1, filteredDirs)
-	}
+	// Assert
+	assert.Equal(t, 1, len(filteredDirs))
+	assert.Equal(t, subDir1, filteredDirs[0])
 }
 
 func TestRunCommandInDirectoriesSequential(t *testing.T) {
@@ -81,10 +81,9 @@ func TestRunCommandInDirectoriesSequential(t *testing.T) {
 	interruptChan := make(chan os.Signal, 1)
 	results := RunCommandInDirectoriesSequential(directories, command, false, false, interruptChan)
 
+	// Assert
 	for dir, err := range results {
-		if err != nil {
-			t.Fatalf("Expected no error in directory %s, got %v", dir, err)
-		}
+		assert.NoError(t, err, "Expected no error in directory %s", dir)
 	}
 }
 
@@ -103,10 +102,9 @@ func TestRunCommandInDirectoriesParallel(t *testing.T) {
 	interruptChan := make(chan os.Signal, 1)
 	results := RunCommandInDirectoriesParallel(directories, command, false, false, interruptChan)
 
+	// Assert
 	for dir, err := range results {
-		if err != nil {
-			t.Fatalf("Expected no error in directory %s, got %v", dir, err)
-		}
+		assert.NoError(t, err, "Expected no error in directory %s", dir)
 	}
 }
 
@@ -125,10 +123,9 @@ func TestDryRun(t *testing.T) {
 	interruptChan := make(chan os.Signal, 1)
 	results := RunCommandInDirectoriesSequential(directories, command, true, false, interruptChan)
 
+	// Assert
 	for dir, err := range results {
-		if err != nil {
-			t.Fatalf("Expected no error in directory %s, got %v", dir, err)
-		}
+		assert.NoError(t, err, "Expected no error in directory %s", dir)
 	}
 }
 
@@ -154,9 +151,8 @@ func TestHandleInterrupt(t *testing.T) {
 
 	results := RunCommandInDirectoriesSequential(directories, command, false, false, interruptChan)
 
+	// Assert
 	for dir, err := range results {
-		if err != nil {
-			t.Fatalf("Expected no error in directory %s, got %v", dir, err)
-		}
+		assert.NoError(t, err, "Expected no error in directory %s", dir)
 	}
 }
