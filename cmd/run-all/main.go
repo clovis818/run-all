@@ -85,7 +85,7 @@ func main() {
 	// Confirm with the user before proceeding
 	fmt.Println("Do you want to proceed with these directories? (yes/no)")
 	confirmation := getUserInput()
-	if strings.ToLower(confirmation) != "yes" {
+	if strings.ToLower(confirmation) != "yes" || strings.ToLower(confirmation) != "y" {
 		fmt.Println("Operation aborted.")
 		return
 	}

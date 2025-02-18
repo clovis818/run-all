@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,28 +18,43 @@ func GetDirectories(pattern string) ([]string, error) {
 func ExcludeDirectories(directories, excludePatterns []string, dirPattern string) []string {
 	var filteredDirs []string
 	excludeMap := make(map[string]bool)
+	excludeRegexps := make([]*regexp.Regexp, 0, len(excludePatterns))
 
-	// Generate exclude map for full paths
-	for _, excludePattern := range excludePatterns {
-		excludedDirs, _ := filepath.Glob(excludePattern)
-		for _, dir := range excludedDirs {
-			excludeMap[dir] = true
-		}
+	// Store exact match patterns in a map for quick lookup
+	for _, pattern := range excludePatterns {
+		excludeMap[pattern] = true
 	}
 
-	// Generate exclude map for relative paths
-	for _, dir := range directories {
-		for _, excludePattern := range excludePatterns {
-			relativeExcludePath := filepath.Join(filepath.Dir(dirPattern), excludePattern)
-			if strings.HasPrefix(dir, relativeExcludePath) {
-				excludeMap[dir] = true
-				break
+	// Convert glob patterns to regex and compile them
+	for _, pattern := range excludePatterns {
+		if strings.Contains(pattern, "*") {
+			regexPattern := "^" + regexp.QuoteMeta(pattern)
+			regexPattern = strings.ReplaceAll(regexPattern, "\\*", ".*")
+			re, err := regexp.Compile(regexPattern)
+			if err == nil {
+				excludeRegexps = append(excludeRegexps, re)
 			}
 		}
 	}
 
+	// Check each directory against exact matches and regex patterns
 	for _, dir := range directories {
-		if !excludeMap[dir] {
+		if excludeMap[filepath.Base(dir)] {
+			continue
+		}
+		if excludeMap[dir] {
+			continue
+		}
+
+		shouldExclude := false
+		for _, re := range excludeRegexps {
+			if re.MatchString(dir) {
+				shouldExclude = true
+				break
+			}
+		}
+
+		if !shouldExclude {
 			filteredDirs = append(filteredDirs, dir)
 		}
 	}
