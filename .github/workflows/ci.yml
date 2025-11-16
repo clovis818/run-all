@@ -5,64 +5,96 @@ on:
     branches:
       - main
       - master
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         go-version: [1.22.x]
-        os: [linux, darwin, windows]
-        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Run unit tests
+        run: go test -v ./...
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            arch: amd64
+            ext: ""
+          - goos: linux
+            arch: arm64
+            ext: ""
+          - goos: darwin
+            arch: amd64
+            ext: ""
+          - goos: darwin
+            arch: arm64
+            ext: ""
+          - goos: windows
+            arch: amd64
+            ext: ".exe"
+          - goos: windows
+            arch: arm64
+            ext: ".exe"
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ matrix.go-version }}
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22.x
 
-    - name: Install dependencies
-      run: go mod tidy
+      - name: Download modules
+        run: go mod download
 
-    - name: Run unit tests
-      run: go test -v ./...
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.arch }}
+          BINARY_NAME: run-all-${{ matrix.goos }}-${{ matrix.arch }}${{ matrix.ext }}
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags="-s -w" -o dist/$BINARY_NAME ./cmd/run-all
 
-    - name: Build binaries
-      run: |
-        if [ "${{ matrix.os }}" == "linux" ]; then
-          GOOS=linux GOARCH=${{ matrix.arch }} go build -o run-all-linux-${{ matrix.arch }} ./cmd/run-all
-          zip run-all-linux-${{ matrix.arch }}.zip run-all-linux-${{ matrix.arch }}
-        elif [ "${{ matrix.os }}" == "darwin" ]; then
-          GOOS=darwin GOARCH=${{ matrix.arch }} go build -o run-all-darwin-${{ matrix.arch }} ./cmd/run-all
-          zip run-all-darwin-${{ matrix.arch }}.zip run-all-darwin-${{ matrix.arch }}
-        elif [ "${{ matrix.os }}" == "windows" ]; then
-          GOOS=windows GOARCH=${{ matrix.arch }} go build -o run-all-windows-${{ matrix.arch }}.exe ./cmd/run-all
-          zip run-all-windows-${{ matrix.arch }}.zip run-all-windows-${{ matrix.arch }}.exe
-        fi
-      shell: bash
+      - name: Archive binary
+        env:
+          ARCHIVE_NAME: run-all-${{ matrix.goos }}-${{ matrix.arch }}
+          BINARY_NAME: run-all-${{ matrix.goos }}-${{ matrix.arch }}${{ matrix.ext }}
+        run: |
+          cd dist
+          zip $ARCHIVE_NAME.zip $BINARY_NAME
 
-    - name: Generate SHA256 checksums
-      run: |
-        if [ "${{ matrix.os }}" == "linux" ]; then
-          shasum -a 256 run-all-linux-${{ matrix.arch }}.zip > run-all-linux-${{ matrix.arch }}.zip.sha256
-        elif [ "${{ matrix.os }}" == "darwin" ]; then
-          shasum -a 256 run-all-darwin-${{ matrix.arch }}.zip > run-all-darwin-${{ matrix.arch }}.zip.sha256
-        elif [ "${{ matrix.os }}" == "windows" ]; then
-          shasum -a 256 run-all-windows-${{ matrix.arch }}.zip > run-all-windows-${{ matrix.arch }}.zip.sha256
-        fi
-      shell: bash
+      - name: Generate and verify SHA256 checksum
+        env:
+          ARCHIVE_NAME: run-all-${{ matrix.goos }}-${{ matrix.arch }}
+        run: |
+          cd dist
+          shasum -a 256 $ARCHIVE_NAME.zip > $ARCHIVE_NAME.zip.sha256
+          shasum -a 256 --check $ARCHIVE_NAME.zip.sha256
 
-    - name: List files (debugging)
-      run: ls -alh
-
-    - name: Upload zipped binaries and checksums as artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: binaries-${{ matrix.os }}-${{ matrix.arch }}
-        path: |
-          run-all-${{ matrix.os }}-${{ matrix.arch }}.zip
-          run-all-${{ matrix.os }}-${{ matrix.arch }}.zip.sha256
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.goos }}-${{ matrix.arch }}
+          path: |
+            dist/run-all-${{ matrix.goos }}-${{ matrix.arch }}.zip
+            dist/run-all-${{ matrix.goos }}-${{ matrix.arch }}.zip.sha256
