@@ -90,13 +90,14 @@ func RunCommandInDirectoriesSequential(
 			fmt.Printf("Running command in directory: %s\n", dir)
 			fmt.Println(strings.Repeat("#", GetTerminalWidth()))
 
-			if dryRun {
-				fmt.Printf("[Dry Run] Command to be run in directory '%s': %s\n", dir, command)
-			} else {
-				err := RunCommandInDirectory(dir, command)
-				results[dir] = err
-				if err != nil && !continueOnFailure {
-					fmt.Printf("Error running command in directory '%s': %v\n", dir, err)
+				if dryRun {
+					fmt.Printf("[Dry Run] Command to be run in directory '%s': %s\n", dir, command)
+					results[dir] = nil
+				} else {
+					err := RunCommandInDirectory(dir, command)
+					results[dir] = err
+					if err != nil && !continueOnFailure {
+						fmt.Printf("Error running command in directory '%s': %v\n", dir, err)
 					return results
 				}
 			}
@@ -119,6 +120,13 @@ func RunCommandInDirectoriesParallel(
 	results := make(map[string]error)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	stopChan := make(chan struct{})
+	var stopOnce sync.Once
+	stop := func() {
+		stopOnce.Do(func() {
+			close(stopChan)
+		})
+	}
 
 	for _, dir := range directories {
 		wg.Add(1)
@@ -127,19 +135,22 @@ func RunCommandInDirectoriesParallel(
 			select {
 			case <-interruptChan:
 				return
+			case <-stopChan:
+				return
 			default:
-				output := RunCommandInDirectoryParallel(dir, command, dryRun)
-				mu.Lock()
-				results[dir] = output.err
-				if output.err != nil {
-					fmt.Printf("Error running command in directory '%s': %v\n", dir, output.out)
-					if !continueOnFailure {
-						mu.Unlock()
-						return
-					}
-				}
-				PrintCommandOutput(dir, output.out)
-				mu.Unlock()
+			}
+			output := RunCommandInDirectoryParallel(dir, command, dryRun)
+			mu.Lock()
+			results[dir] = output.err
+			if output.err != nil {
+				fmt.Printf("Error running command in directory '%s': %v\n", dir, output.err)
+			}
+			PrintCommandOutput(dir, output.out)
+			shouldStop := output.err != nil && !continueOnFailure
+			mu.Unlock()
+
+			if shouldStop {
+				stop()
 			}
 		}(dir)
 	}

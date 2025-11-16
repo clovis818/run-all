@@ -33,6 +33,7 @@ func main() {
 		"Continue executing commands in other directories even if one fails",
 	)
 	parallel := flag.Bool("parallel", false, "Run commands in parallel")
+	autoYes := flag.Bool("yes", false, "Skip confirmation prompt and proceed immediately")
 	flag.Parse()
 
 	if *dirPattern == "" {
@@ -83,11 +84,13 @@ func main() {
 	}
 
 	// Confirm with the user before proceeding
-	fmt.Println("Do you want to proceed with these directories? (yes/no)")
-	confirmation := getUserInput()
-	if strings.ToLower(confirmation) != "yes" || strings.ToLower(confirmation) != "y" {
-		fmt.Println("Operation aborted.")
-		return
+	if !*autoYes {
+		fmt.Println("Do you want to proceed with these directories? (yes/no)")
+		confirmation := strings.ToLower(getUserInput())
+		if confirmation != "yes" && confirmation != "y" {
+			fmt.Println("Operation aborted.")
+			return
+		}
 	}
 
 	var results map[string]error
