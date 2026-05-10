@@ -6,7 +6,17 @@ on:
       - main
       - master
   pull_request:
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to upload binary assets to, for example v1.0.5
+        required: false
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -33,6 +43,8 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       matrix:
         include:
@@ -99,3 +111,15 @@ jobs:
           path: |
             dist/run-all-${{ matrix.goos }}-${{ matrix.arch }}.zip
             dist/run-all-${{ matrix.goos }}-${{ matrix.arch }}.zip.sha256
+
+      - name: Upload release assets
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
+          ARCHIVE_NAME: run-all-${{ matrix.goos }}-${{ matrix.arch }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            "dist/$ARCHIVE_NAME.zip" \
+            "dist/$ARCHIVE_NAME.zip.sha256" \
+            --clobber
