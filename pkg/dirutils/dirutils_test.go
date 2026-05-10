@@ -53,7 +53,8 @@ func TestFilterDirectoriesWithRequirement(t *testing.T) {
 	subDir2 := filepath.Join(testDir, "subdir2")
 	_ = os.Mkdir(subDir1, 0755)
 	_ = os.Mkdir(subDir2, 0755)
-	_, _ = os.Create(filepath.Join(subDir1, ".git"))
+	err := os.WriteFile(filepath.Join(subDir1, ".git"), nil, 0644)
+	assert.NoError(t, err)
 	defer os.RemoveAll(testDir)
 
 	directories := []string{subDir1, subDir2}
