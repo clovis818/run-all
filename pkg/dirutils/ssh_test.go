@@ -3,6 +3,7 @@ package dirutils
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -48,6 +49,93 @@ func (f *fakeSSHRunner) getCalls() []sshCall {
 	copy(calls, f.calls)
 
 	return calls
+}
+
+func TestNewSSHCommandUsesFixedExecutableAndPath(t *testing.T) {
+	unsafePath := filepath.Join(t.TempDir(), "bin")
+	t.Setenv("PATH", unsafePath)
+	config := currentSSHPlatformConfig()
+
+	cmd := newSSHCommand(
+		"web1.example.com",
+		"hostname",
+		SSHOptions{KeyPath: "/tmp/test-key"},
+	)
+
+	assert.Equal(t, config.executablePath, cmd.Path)
+	assert.Equal(
+		t,
+		[]string{config.executablePath, "-i", "/tmp/test-key", "web1.example.com", "hostname"},
+		cmd.Args,
+	)
+	assert.Equal(t, config.fixedPath, envValue(cmd.Env, "PATH"))
+}
+
+func TestSSHPlatformConfigForSupportedOSes(t *testing.T) {
+	tests := []struct {
+		name string
+		goos string
+		want sshPlatformConfig
+	}{
+		{
+			name: "linux",
+			goos: "linux",
+			want: sshPlatformConfig{
+				executablePath: "/usr/bin/ssh",
+				fixedPath:      "/usr/bin:/bin:/usr/sbin:/sbin",
+			},
+		},
+		{
+			name: "macos",
+			goos: "darwin",
+			want: sshPlatformConfig{
+				executablePath: "/usr/bin/ssh",
+				fixedPath:      "/usr/bin:/bin:/usr/sbin:/sbin",
+			},
+		},
+		{
+			name: "windows",
+			goos: "windows",
+			want: sshPlatformConfig{
+				executablePath: `C:\Windows\System32\OpenSSH\ssh.exe`,
+				fixedPath:      `C:\Windows\System32\OpenSSH;C:\Windows\System32;C:\Windows`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, sshPlatformConfigFor(tt.goos))
+		})
+	}
+}
+
+func TestSSHEnvironmentReplacesPathCaseInsensitively(t *testing.T) {
+	env := sshEnvironment(
+		[]string{
+			"HOME=/home/test",
+			"PATH=/tmp/bin",
+			"Path=C:\\Users\\test\\bin",
+		},
+		"/usr/bin:/bin",
+	)
+
+	assert.Equal(
+		t,
+		[]string{"HOME=/home/test", "PATH=/usr/bin:/bin"},
+		env,
+	)
+}
+
+func envValue(env []string, key string) string {
+	for _, entry := range env {
+		envKey, value, found := strings.Cut(entry, "=")
+		if found && strings.EqualFold(envKey, key) {
+			return value
+		}
+	}
+
+	return ""
 }
 
 func TestParseHosts(t *testing.T) {

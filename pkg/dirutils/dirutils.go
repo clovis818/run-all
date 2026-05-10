@@ -6,10 +6,18 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 )
+
+const defaultTerminalWidth = 80
+
+type shellConfig struct {
+	executablePath string
+	args           []string
+}
 
 func GetDirectories(pattern string) ([]string, error) {
 	return filepath.Glob(pattern)
@@ -90,14 +98,14 @@ func RunCommandInDirectoriesSequential(
 			fmt.Printf("Running command in directory: %s\n", dir)
 			fmt.Println(strings.Repeat("#", GetTerminalWidth()))
 
-				if dryRun {
-					fmt.Printf("[Dry Run] Command to be run in directory '%s': %s\n", dir, command)
-					results[dir] = nil
-				} else {
-					err := RunCommandInDirectory(dir, command)
-					results[dir] = err
-					if err != nil && !continueOnFailure {
-						fmt.Printf("Error running command in directory '%s': %v\n", dir, err)
+			if dryRun {
+				fmt.Printf("[Dry Run] Command to be run in directory '%s': %s\n", dir, command)
+				results[dir] = nil
+			} else {
+				err := RunCommandInDirectory(dir, command)
+				results[dir] = err
+				if err != nil && !continueOnFailure {
+					fmt.Printf("Error running command in directory '%s': %v\n", dir, err)
 					return results
 				}
 			}
@@ -171,8 +179,7 @@ func RunCommandInDirectoryParallel(dir, command string, dryRun bool) (output str
 		)
 		return
 	}
-	cmd := exec.Command("sh", "-c", command)
-	cmd.Dir = dir
+	cmd := newLocalCommand(dir, command)
 	var out strings.Builder
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -192,12 +199,42 @@ func PrintCommandOutput(dir, output string) {
 }
 
 func RunCommandInDirectory(dir, command string) error {
-	cmd := exec.Command("sh", "-c", command)
-	cmd.Dir = dir
+	cmd := newLocalCommand(dir, command)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
+}
+
+func newLocalCommand(dir, command string) *exec.Cmd {
+	config := currentShellConfig()
+	args := make([]string, 0, len(config.args)+1)
+	args = append(args, config.args...)
+	args = append(args, command)
+
+	cmd := exec.Command(config.executablePath, args...)
+	cmd.Dir = dir
+
+	return cmd
+}
+
+func currentShellConfig() shellConfig {
+	return shellConfigFor(runtime.GOOS)
+}
+
+func shellConfigFor(goos string) shellConfig {
+	switch goos {
+	case "windows":
+		return shellConfig{
+			executablePath: `C:\Windows\System32\cmd.exe`,
+			args:           []string{"/D", "/S", "/C"},
+		}
+	default:
+		return shellConfig{
+			executablePath: "/bin/sh",
+			args:           []string{"-c"},
+		}
+	}
 }
 
 func PrintResultsSummary(results map[string]error) {
@@ -212,16 +249,35 @@ func PrintResultsSummary(results map[string]error) {
 }
 
 func GetTerminalWidth() int {
-	width := 80 // default width
-	cmd := exec.Command("tput", "cols")
-	output, err := cmd.Output()
-	if err != nil {
+	if width := terminalWidthFromColumns(os.Getenv("COLUMNS")); width > 0 {
 		return width
 	}
+	if runtime.GOOS == "windows" {
+		return defaultTerminalWidth
+	}
 
-	if w, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil {
-		width = w
+	return terminalWidthFromTput()
+}
+
+func terminalWidthFromColumns(columns string) int {
+	width, err := strconv.Atoi(strings.TrimSpace(columns))
+	if err != nil || width <= 0 {
+		return 0
 	}
 
 	return width
+}
+
+func terminalWidthFromTput() int {
+	cmd := exec.Command("tput", "cols")
+	output, err := cmd.Output()
+	if err != nil {
+		return defaultTerminalWidth
+	}
+
+	if w, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil && w > 0 {
+		return w
+	}
+
+	return defaultTerminalWidth
 }

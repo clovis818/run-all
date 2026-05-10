@@ -24,6 +24,15 @@ go build -o run-all cmd/run-all/main.go
 
 Alternatively, you can download the latest release from the [Releases](https://github.com/clovis818/run-all/releases) page.
 
+## Supported Platforms
+
+`run-all` supports Linux, macOS, and Windows. Local commands run through the native platform shell:
+
+- Linux/macOS: `/bin/sh -c`
+- Windows: `C:\Windows\System32\cmd.exe /D /S /C`
+
+SSH mode uses the system OpenSSH client on each platform.
+
 ## Usage
 ```bash
 run-all [options]

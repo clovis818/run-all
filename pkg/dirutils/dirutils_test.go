@@ -66,6 +66,80 @@ func TestFilterDirectoriesWithRequirement(t *testing.T) {
 	assert.Equal(t, subDir1, filteredDirs[0])
 }
 
+func TestNewLocalCommandUsesPlatformShell(t *testing.T) {
+	testDir := t.TempDir()
+	command := "echo Hello"
+	config := currentShellConfig()
+
+	cmd := newLocalCommand(testDir, command)
+	wantArgs := append([]string{config.executablePath}, config.args...)
+	wantArgs = append(wantArgs, command)
+
+	assert.Equal(t, config.executablePath, cmd.Path)
+	assert.Equal(t, wantArgs, cmd.Args)
+	assert.Equal(t, testDir, cmd.Dir)
+}
+
+func TestShellConfigForSupportedOSes(t *testing.T) {
+	tests := []struct {
+		name string
+		goos string
+		want shellConfig
+	}{
+		{
+			name: "linux",
+			goos: "linux",
+			want: shellConfig{
+				executablePath: "/bin/sh",
+				args:           []string{"-c"},
+			},
+		},
+		{
+			name: "macos",
+			goos: "darwin",
+			want: shellConfig{
+				executablePath: "/bin/sh",
+				args:           []string{"-c"},
+			},
+		},
+		{
+			name: "windows",
+			goos: "windows",
+			want: shellConfig{
+				executablePath: `C:\Windows\System32\cmd.exe`,
+				args:           []string{"/D", "/S", "/C"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, shellConfigFor(tt.goos))
+		})
+	}
+}
+
+func TestTerminalWidthFromColumns(t *testing.T) {
+	tests := []struct {
+		name    string
+		columns string
+		want    int
+	}{
+		{name: "valid", columns: "120", want: 120},
+		{name: "valid with spaces", columns: "  100  ", want: 100},
+		{name: "empty", columns: "", want: 0},
+		{name: "non numeric", columns: "wide", want: 0},
+		{name: "zero", columns: "0", want: 0},
+		{name: "negative", columns: "-1", want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, terminalWidthFromColumns(tt.columns))
+		})
+	}
+}
+
 func TestRunCommandInDirectoriesSequential(t *testing.T) {
 	// Setup
 	testDir := t.TempDir()

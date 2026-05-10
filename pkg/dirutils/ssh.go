@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,8 +24,13 @@ type openSSHRunner struct{}
 
 var sshRunner sshCommandRunner = openSSHRunner{}
 
+type sshPlatformConfig struct {
+	executablePath string
+	fixedPath      string
+}
+
 func (openSSHRunner) Run(host, command string, options SSHOptions) error {
-	cmd := exec.Command("ssh", buildSSHArgs(host, command, options)...)
+	cmd := newSSHCommand(host, command, options)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -32,7 +38,7 @@ func (openSSHRunner) Run(host, command string, options SSHOptions) error {
 }
 
 func (openSSHRunner) RunOutput(host, command string, options SSHOptions) (string, error) {
-	cmd := exec.Command("ssh", buildSSHArgs(host, command, options)...)
+	cmd := newSSHCommand(host, command, options)
 	var out strings.Builder
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -40,6 +46,46 @@ func (openSSHRunner) RunOutput(host, command string, options SSHOptions) (string
 	err := cmd.Run()
 
 	return out.String(), err
+}
+
+func newSSHCommand(host, command string, options SSHOptions) *exec.Cmd {
+	config := currentSSHPlatformConfig()
+	cmd := exec.Command(config.executablePath, buildSSHArgs(host, command, options)...)
+	cmd.Env = sshEnvironment(os.Environ(), config.fixedPath)
+
+	return cmd
+}
+
+func currentSSHPlatformConfig() sshPlatformConfig {
+	return sshPlatformConfigFor(runtime.GOOS)
+}
+
+func sshPlatformConfigFor(goos string) sshPlatformConfig {
+	switch goos {
+	case "windows":
+		return sshPlatformConfig{
+			executablePath: `C:\Windows\System32\OpenSSH\ssh.exe`,
+			fixedPath:      `C:\Windows\System32\OpenSSH;C:\Windows\System32;C:\Windows`,
+		}
+	default:
+		return sshPlatformConfig{
+			executablePath: "/usr/bin/ssh",
+			fixedPath:      "/usr/bin:/bin:/usr/sbin:/sbin",
+		}
+	}
+}
+
+func sshEnvironment(env []string, fixedPath string) []string {
+	safeEnv := make([]string, 0, len(env)+1)
+	for _, entry := range env {
+		key, _, found := strings.Cut(entry, "=")
+		if found && strings.EqualFold(key, "PATH") {
+			continue
+		}
+		safeEnv = append(safeEnv, entry)
+	}
+
+	return append(safeEnv, "PATH="+fixedPath)
 }
 
 func buildSSHArgs(host, command string, options SSHOptions) []string {
