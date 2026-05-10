@@ -10,6 +10,7 @@
 - **Exclude Directories**: Specify directories or patterns to exclude from execution.
 - **Dry Run**: Test what will happen without actually running the commands.
 - **Error Handling**: Optionally continue running commands in other directories even if one command fails.
+- **SSH Execution**: Run the same command across multiple SSH hosts using your OpenSSH configuration.
 
 ## Installation
 
@@ -45,11 +46,26 @@ run-all [options]
 - `-exclude string`  
   Comma-separated list of patterns of directories to exclude (relative to dir-pattern or full path).
 
+- `-host-file string`  
+  Path to a newline-delimited SSH host file. Blank lines and lines starting with `#` are ignored.
+
+- `-hosts string`  
+  Comma-separated list of SSH hosts.
+
 - `-parallel`  
   Run commands in parallel.
 
 - `-require string`  
   Required folder or file for a directory to be included.
+
+- `-ssh`  
+  Run commands on SSH hosts instead of local directories.
+
+- `-ssh-key string`  
+  Path to the SSH private key to use with `ssh -i`.
+
+- `-yes`  
+  Skip the confirmation prompt and proceed immediately.
 
 ## Examples
 
@@ -83,6 +99,39 @@ See what would happen if you deploy to all project directories, without actually
 
 ```bash
 run-all -dir-pattern="/apps/*" -require="Dockerfile" -dry-run -command="docker-compose up -d"
+```
+
+### 5. Run a Command on SSH Hosts
+
+Run `hostname` and `uptime` on multiple hosts using your existing SSH config, keys, and agent:
+
+```bash
+run-all -ssh -hosts="web1.example.com,web2.example.com,user@db1" -parallel -yes -command="hostname; uptime"
+```
+
+Use a specific SSH key:
+
+```bash
+run-all -ssh -hosts="web1.example.com,web2.example.com" -ssh-key="$HOME/.ssh/id_ed25519" -command="hostname"
+```
+
+### 6. Run a Command on Hosts from a File
+
+Create a host file:
+
+```text
+# web hosts
+web1.example.com
+web2.example.com
+
+# database hosts
+user@db1
+```
+
+Then run the command:
+
+```bash
+run-all -ssh -host-file="./hosts.txt" -continue-on-failure -command="df -h /"
 ```
 
 ## Contributing
